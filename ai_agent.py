@@ -13,6 +13,8 @@ from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 from google import genai
 from google.genai import types
+from google.genai.errors import ServerError
+import time
 
 # ==========================================
 # --- 1. CONFIGURATION ---
@@ -112,18 +114,26 @@ You must return ONLY a valid JSON object matching the exact structure below. Do 
     # --- 2. GENERATE THE THESIS WITH GEMINI SDK ---
     print("\nConsulting the Gemini Agent...")
 
-    # Using the new client.models.generate_content pattern
+try:
     daily_thesis = gemini_client.models.generate_content(
-        model='gemini-3-flash-preview',
+        model='gemini-2.5-flash',
         contents=user_prompt,
         config=types.GenerateContentConfig(
             system_instruction=system_prompt,
             temperature=0.4,
-            response_mime_type="application/json"
+            response_mime_type="application/json",
+            response_schema=DailyThesis 
         )
     )
+    return daily_thesis.text
 
-    # The response is now a pure JSON string.
+except ServerError as e:
+    print(f"⚠️ Google API is currently overloaded: {e}")
+    print("⏳ Sleeping for 60 seconds and trying one more time...")
+    time.sleep(60)
+    
+    # Simple single retry
+    daily_thesis = gemini_client.models.generate_content(...)
     return daily_thesis.text
 
 if __name__ == "__main__":
