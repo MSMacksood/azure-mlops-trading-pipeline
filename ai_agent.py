@@ -12,6 +12,7 @@ from sqlalchemy.exc import OperationalError
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 from google import genai
+from google.genai import types
 
 # ==========================================
 # --- 1. CONFIGURATION ---
