@@ -164,7 +164,7 @@ if __name__ == "__main__":
     print("\n📬 Sending Alerts...")
     try:
         requests.post(DISCORD_WEBHOOK_URL, json={
-            "content": f"🚨 **New Quant Thesis Alert - {current_date}** 🚨\nRegime: `{current_regime}`\n🌐 **Dashboard:**\n{DASHBOARD_URL}"})
+            "content": f"🚨 **New Quant Thesis Alert - {date_str}** 🚨\nRegime: `{current_regime}`\n🌐 **Dashboard:**\n{DASHBOARD_URL}"})
         print("✅ Discord sent!")
     except Exception as e:
         print(f"❌ Discord failed: {e}")
