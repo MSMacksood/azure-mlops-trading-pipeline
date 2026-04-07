@@ -1,27 +1,22 @@
 import os
 import time
-import struct
-import requests
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+
 import pandas as pd
 import pyodbc
-from sqlalchemy import create_engine, text
-from sqlalchemy.exc import OperationalError
+import requests
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 from google import genai
 from google.genai import types
 from google.genai.errors import ServerError
-import time
+from sqlalchemy import create_engine, text
 
 # ==========================================
 # --- 1. CONFIGURATION ---
 # ==========================================
 SERVER = 'quant-server-123.database.windows.net'
-DATABASE = 'trading-db'                         
-SQL_USER = 'CloudSA65f2d628'   
+DATABASE = 'trading-db'
+SQL_USER = 'CloudSA65f2d628'
 
 DASHBOARD_URL = "https://msm-quant-dashboard.azurewebsites.net"
 KEY_VAULT_URL = os.environ.get("KEY_VAULT_URL", "https://kv-ml-trading-workspace.vault.azure.net/")
@@ -35,16 +30,19 @@ DISCORD_WEBHOOK_URL = secret_client.get_secret("DISCORD-WEBHOOK-URL").value
 SQL_PASSWORD = secret_client.get_secret("SQL-PASSWORD").value
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
+
 # ==========================================
 # --- 2. SQL CONNECTION & DATA RETRIEVAL ---
 # ==========================================
 def get_sql_engine():
     driver = '{ODBC Driver 17 for SQL Server}'
     conn_str = f"DRIVER={driver};SERVER=tcp:{SERVER},1433;DATABASE={DATABASE};Uid={SQL_USER};Pwd={SQL_PASSWORD};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
-    
+
     def get_conn():
         return pyodbc.connect(conn_str)
+
     return create_engine("mssql+pyodbc://", creator=get_conn)
+
 
 # ==========================================
 # --- 3. THESIS GENERATION USING AI ---
@@ -114,36 +112,36 @@ You must return ONLY a valid JSON object matching the exact structure below. Do 
     # --- 2. GENERATE THE THESIS WITH GEMINI SDK ---
     print("\nConsulting the Gemini Agent...")
 
-try:
-    daily_thesis = gemini_client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=user_prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            temperature=0.4,
-            response_mime_type="application/json",
-            response_schema=DailyThesis 
+    try:
+        daily_thesis = gemini_client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=user_prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.4,
+                response_mime_type="application/json"
+            )
         )
-    )
-    return daily_thesis.text
+        return daily_thesis.text
 
-except ServerError as e:
-    print(f"⚠️ Google API is currently overloaded: {e}")
-    print("⏳ Sleeping for 60 seconds and trying one more time...")
-    time.sleep(60)
-    
-    # Simple single retry
-    daily_thesis = gemini_client.models.generate_content(...)
-    return daily_thesis.text
+    except ServerError as e:
+        print(f"⚠️ Google API is currently overloaded: {e}")
+        print("⏳ Sleeping for 60 seconds and trying one more time...")
+        time.sleep(60)
+
+        # Simple single retry
+        daily_thesis = gemini_client.models.generate_content(...)
+        return daily_thesis.text
+
 
 if __name__ == "__main__":
     print("🚀 Initiating Agentic Workflow...")
     engine = get_sql_engine()
-    
+
     # Read only the single most recent day's data
     with engine.connect() as conn:
         df_market = pd.read_sql(text("SELECT TOP 1 * FROM ProcessedMarketData ORDER BY Date DESC"), conn)
-    
+
     latest_data = df_market.iloc[0]
     current_date = pd.to_datetime(latest_data['Date'])
     # Ensure the date is cleanly formatted
@@ -165,6 +163,8 @@ if __name__ == "__main__":
     # --- NOTIFICATIONS ---
     print("\n📬 Sending Alerts...")
     try:
-        requests.post(DISCORD_WEBHOOK_URL, json={"content": f"🚨 **New Quant Thesis Alert - {current_date}** 🚨\nRegime: `{current_regime}`\n🌐 **Dashboard:**\n{DASHBOARD_URL}"})
+        requests.post(DISCORD_WEBHOOK_URL, json={
+            "content": f"🚨 **New Quant Thesis Alert - {current_date}** 🚨\nRegime: `{current_regime}`\n🌐 **Dashboard:**\n{DASHBOARD_URL}"})
         print("✅ Discord sent!")
-    except Exception as e: print(f"❌ Discord failed: {e}")
+    except Exception as e:
+        print(f"❌ Discord failed: {e}")
