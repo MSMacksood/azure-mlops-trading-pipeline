@@ -8,7 +8,7 @@ from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 from google import genai
 from google.genai import types
-from google.genai.errors import ServerError
+from google.genai.errors import ServerError, ClientError
 from sqlalchemy import create_engine, text
 
 # ==========================================
@@ -131,7 +131,7 @@ You must return ONLY a valid JSON object matching the exact structure below. Do 
 
     try:
         daily_thesis = gemini_client.models.generate_content(
-            model='gemini-3.1-pro-preview',  # High-tier model with better reasoning capabilities
+            model='gemini-3-flash-preview',  # Gemini 3 Flash
             contents=user_prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
@@ -141,12 +141,12 @@ You must return ONLY a valid JSON object matching the exact structure below. Do 
         )
         return daily_thesis.text
 
-    except ServerError as e:
-        logger.warning("Primary model gemini-3.1-pro-preview is unavailable: %s", e)
-        logger.info("Retrying with gemini-3-flash-preview")
+    except ServerError | ClientError as e:
+        logger.warning("Primary model gemini-3-flash-preview is unavailable: %s", e)
+        logger.info("Retrying with gemini-2.5-flash")
 
         daily_thesis = gemini_client.models.generate_content(
-            model='gemini-3-flash-preview',  # Low-tier model with limited reasoning capabilities as fallback
+            model='gemini-2.5-flash',  # Gemini 2.5 Flash
             contents=user_prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
